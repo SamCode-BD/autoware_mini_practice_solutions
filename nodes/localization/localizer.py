@@ -27,7 +27,6 @@ class Localizer:
         # create a coordinate transformer
         self.transformer = Transformer.from_crs(self.crs_wgs84, self.crs_utm)
         self.origin_x, self.origin_y = self.transformer.transform(utm_origin_lat, utm_origin_lon)
-        print(self.origin_x, self.origin_y, utm_origin_lat, utm_origin_lon)
         
         
         # Subscribers
@@ -47,13 +46,14 @@ class Localizer:
         # calculate azimuth correction
         azimuth_correction = self.utm_projection.get_factors(msg.longitude, msg.latitude).meridian_convergence
         azimuth = msg.azimuth - azimuth_correction
+        azimuth = azimuth*math.pi/180
         yaw = convert_azimuth_to_yaw(azimuth)
 
         # Convert yaw to quaternion
         x, y, z, w = quaternion_from_euler(0, 0, yaw)
         orientation = Quaternion(x, y, z, w)
         final_z = msg.height - self.undulation
-        #print(final_x, final_y, final_z)
+
         # publish current pose
         current_pose_msg = PoseStamped()
         current_pose_msg.header.stamp = msg.header.stamp
