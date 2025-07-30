@@ -53,14 +53,17 @@ class PurePursuitFollower:
         # using euler_from_quaternion to get the heading angle
 
         _, _, heading = euler_from_quaternion([msg.pose.orientation.x, msg.pose.orientation.y, msg.pose.orientation.z, msg.pose.orientation.w])
+        print("heading angle", heading)
 
-       
         lookahead_point =  self.path_linestring.interpolate(d_ego_from_path_start + self.lookahead_distance)
         
         # lookahead point heading calculation
         lookahead_heading = np.arctan2(lookahead_point.y - current_pose.y, lookahead_point.x - current_pose.x)
+        print("lookahead heading", lookahead_heading)
+        
+        alpha = lookahead_heading - heading
 
-        alpha = heading - lookahead_heading
+        print("alpha", alpha)
 
         ld = distance(current_pose, lookahead_point)
 
