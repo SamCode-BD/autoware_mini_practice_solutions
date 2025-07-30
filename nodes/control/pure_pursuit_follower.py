@@ -83,7 +83,6 @@ class PurePursuitFollower:
         self.vehicle_cmd.ctrl_cmd.steering_angle = steering_angle
 
         velocity = self.distance_to_velocity_interpolator(d_ego_from_path_start)
-        print(velocity)
     
     def run(self):
         rospy.spin()
