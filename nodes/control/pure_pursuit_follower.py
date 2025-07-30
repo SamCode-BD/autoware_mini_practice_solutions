@@ -10,6 +10,8 @@ from autoware_mini.msg import VehicleCmd
 from shapely.geometry import LineString, Point
 from shapely import prepare, distance
 from tf.transformations import euler_from_quaternion
+from scipy.interpolate import interp1d
+
 
 class PurePursuitFollower:
     def __init__(self):
@@ -19,7 +21,7 @@ class PurePursuitFollower:
         # Reading in the parameter values
         self.lookahead_distance = rospy.get_param("~lookahead_distance")
         self.wheel_base = rospy.get_param("/vehicle/wheel_base")
-
+        self.distance_to_velocity_interpolator = None
         # Publishers
         self.vehicle_cmd_pub = rospy.Publisher('/control/vehicle_cmd', VehicleCmd, queue_size=10)
 
@@ -37,11 +39,24 @@ class PurePursuitFollower:
         self.path_linestring = LineString([(w.position.x, w.position.y) for w in msg.waypoints])
         # prepare path - creates spatial tree, making the spatial queries more efficient
         prepare(self.path_linestring)
+        # collect waypoint x and y coordinates
+        waypoints_xy = np.array([(w.position.x, w.position.y) for w in msg.waypoints])
+        # Calculate distances between points
+        distances = np.cumsum(np.sqrt(np.sum(np.diff(waypoints_xy, axis=0)**2, axis=1)))
+        # add 0 distance in the beginning
+        distances = np.insert(distances, 0, 0)
+        # Extract velocity values at waypoints
+        velocities = np.array([w.speed for w in msg.waypoints])
+        
+        self.distance_to_velocity_interpolator = interp1d(distances, velocities, kind='linear', bounds_error = True)
+        
 
     def current_pose_callback(self, msg):
         # TODO
         if self.path_linestring is None:
             return
+        if self.distance_to_velocity_interpolator is None:
+            return 
         
         self.vehicle_cmd.header.stamp = msg.header.stamp
         self.vehicle_cmd.header.frame_id = 'base_link'
@@ -53,17 +68,13 @@ class PurePursuitFollower:
         # using euler_from_quaternion to get the heading angle
 
         _, _, heading = euler_from_quaternion([msg.pose.orientation.x, msg.pose.orientation.y, msg.pose.orientation.z, msg.pose.orientation.w])
-        print("heading angle", heading)
 
         lookahead_point =  self.path_linestring.interpolate(d_ego_from_path_start + self.lookahead_distance)
         
         # lookahead point heading calculation
         lookahead_heading = np.arctan2(lookahead_point.y - current_pose.y, lookahead_point.x - current_pose.x)
-        print("lookahead heading", lookahead_heading)
         
         alpha = lookahead_heading - heading
-
-        print("alpha", alpha)
 
         ld = distance(current_pose, lookahead_point)
 
@@ -71,8 +82,9 @@ class PurePursuitFollower:
 
         self.vehicle_cmd.ctrl_cmd.steering_angle = steering_angle
 
-
- 
+        velocity = self.distance_to_velocity_interpolator(d_ego_from_path_start)
+        print(velocity)
+    
     def run(self):
         rospy.spin()
 
