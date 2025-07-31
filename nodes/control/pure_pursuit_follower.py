@@ -54,6 +54,9 @@ class PurePursuitFollower:
         
         if self.path_linestring is None:
             vehicle_cmd.ctrl_cmd.linear_velocity = 0
+            vehicle_cmd.header.stamp = msg.header.stamp
+            vehicle_cmd.header.frame_id = 'base_link'
+            self.vehicle_cmd_pub.publish(vehicle_cmd)
             return
         
         if self.distance_to_velocity_interpolator is None:
