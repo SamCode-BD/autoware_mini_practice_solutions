@@ -53,6 +53,7 @@ class PurePursuitFollower:
         vehicle_cmd = VehicleCmd()
         
         if self.path_linestring is None:
+            print("imhere")
             vehicle_cmd.ctrl_cmd.linear_velocity = 0
             vehicle_cmd.header.stamp = msg.header.stamp
             vehicle_cmd.header.frame_id = 'base_link'
@@ -64,7 +65,7 @@ class PurePursuitFollower:
         
         
         vehicle_cmd.ctrl_cmd.steering_angle = 0.2
-        vehicle_cmd.ctrl_cmd.linear_velocity = 10.0
+        #vehicle_cmd.ctrl_cmd.linear_velocity = 10.0
         vehicle_cmd.header.stamp = msg.header.stamp
         vehicle_cmd.header.frame_id = 'base_link'
         
@@ -78,6 +79,13 @@ class PurePursuitFollower:
 
         lookahead_point =  self.path_linestring.interpolate(d_ego_from_path_start + self.lookahead_distance)
         
+        #if lookahead_point is None:
+          #  print("heylookatme")
+          #  vehicle_cmd.ctrl_cmd.linear_velocity = 0
+           # vehicle_cmd.header.stamp = msg.header.stamp
+           # vehicle_cmd.header.frame_id = 'base_link'
+           # return
+
         # lookahead point heading calculation
         lookahead_heading = np.arctan2(lookahead_point.y - current_pose.y, lookahead_point.x - current_pose.x)
         
