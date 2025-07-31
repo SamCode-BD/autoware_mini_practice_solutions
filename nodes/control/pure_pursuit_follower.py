@@ -29,9 +29,6 @@ class PurePursuitFollower:
         rospy.Subscriber('path', Path, self.path_callback, queue_size=1)
         rospy.Subscriber('/localization/current_pose', PoseStamped, self.current_pose_callback, queue_size=1)
 
-        self.vehicle_cmd = VehicleCmd()
-        self.vehicle_cmd.ctrl_cmd.steering_angle = 0.2
-        self.vehicle_cmd.ctrl_cmd.linear_velocity = 10.0
 
     def path_callback(self, msg):
         # TODO
@@ -53,14 +50,21 @@ class PurePursuitFollower:
 
     def current_pose_callback(self, msg):
         # TODO
+        vehicle_cmd = VehicleCmd()
+        
         if self.path_linestring is None:
+            vehicle_cmd.ctrl_cmd.linear_velocity = 0
             return
+        
         if self.distance_to_velocity_interpolator is None:
             return 
         
-        self.vehicle_cmd.header.stamp = msg.header.stamp
-        self.vehicle_cmd.header.frame_id = 'base_link'
-        self.vehicle_cmd_pub.publish(self.vehicle_cmd)
+        
+        vehicle_cmd.ctrl_cmd.steering_angle = 0.2
+        vehicle_cmd.ctrl_cmd.linear_velocity = 10.0
+        vehicle_cmd.header.stamp = msg.header.stamp
+        vehicle_cmd.header.frame_id = 'base_link'
+        
 
         current_pose = Point([msg.pose.position.x, msg.pose.position.y])
         d_ego_from_path_start = self.path_linestring.project(current_pose)
@@ -80,10 +84,14 @@ class PurePursuitFollower:
 
         steering_angle = np.arctan((2*self.wheel_base*math.sin(alpha))/ld)
 
-        self.vehicle_cmd.ctrl_cmd.steering_angle = steering_angle
+        vehicle_cmd.ctrl_cmd.steering_angle = steering_angle
 
         velocity = self.distance_to_velocity_interpolator(d_ego_from_path_start)
-    
+        vehicle_cmd.ctrl_cmd.linear_velocity = velocity
+
+        self.vehicle_cmd_pub.publish(vehicle_cmd)
+
+
     def run(self):
         rospy.spin()
 
