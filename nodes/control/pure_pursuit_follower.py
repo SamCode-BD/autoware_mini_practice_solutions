@@ -34,6 +34,9 @@ class PurePursuitFollower:
         # TODO
         # convert waypoints to shapely linestring
         self.path_linestring = LineString([(w.position.x, w.position.y) for w in msg.waypoints])
+
+        if self.path_linestring.is_empty:
+            return
         # prepare path - creates spatial tree, making the spatial queries more efficient
         prepare(self.path_linestring)
         # collect waypoint x and y coordinates
@@ -53,7 +56,6 @@ class PurePursuitFollower:
         vehicle_cmd = VehicleCmd()
         
         if self.path_linestring is None:
-            print("imhere")
             vehicle_cmd.ctrl_cmd.linear_velocity = 0
             vehicle_cmd.header.stamp = msg.header.stamp
             vehicle_cmd.header.frame_id = 'base_link'
@@ -77,12 +79,12 @@ class PurePursuitFollower:
 
         lookahead_point =  self.path_linestring.interpolate(d_ego_from_path_start + self.lookahead_distance)
         
-        #if lookahead_point is None:
-          #  print("heylookatme")
-          #  vehicle_cmd.ctrl_cmd.linear_velocity = 0
-           # vehicle_cmd.header.stamp = msg.header.stamp
-           # vehicle_cmd.header.frame_id = 'base_link'
-           # return
+        if lookahead_point is None:
+            vehicle_cmd.ctrl_cmd.linear_velocity = 0
+            vehicle_cmd.header.stamp = msg.header.stamp
+            vehicle_cmd.header.frame_id = 'base_link'
+            self.vehicle_cmd_pub.publish(vehicle_cmd)
+            return
 
         # lookahead point heading calculation
         lookahead_heading = np.arctan2(lookahead_point.y - current_pose.y, lookahead_point.x - current_pose.x)
