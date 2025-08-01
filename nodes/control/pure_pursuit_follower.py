@@ -64,8 +64,6 @@ class PurePursuitFollower:
             return 
         
         
-        vehicle_cmd.ctrl_cmd.steering_angle = 0.2
-        #vehicle_cmd.ctrl_cmd.linear_velocity = 10.0
         vehicle_cmd.header.stamp = msg.header.stamp
         vehicle_cmd.header.frame_id = 'base_link'
         

@@ -12,7 +12,9 @@ from lanelet2.core import BasicPoint2d
 from lanelet2.geometry import findNearest
 from autoware_mini.lanelet2 import load_lanelet2_map
 from geometry_msgs.msg import PoseStamped
-from autoware_mini.msg import Path, Waypoint, VehicleCmd
+from autoware_mini.msg import Path, Waypoint
+from autoware_mini.path import PathWrapper
+import shapely
  
 
 
@@ -23,16 +25,13 @@ class Lanelet2GlobalPlanner:
         #Parameters
         lanelet2_map_path = rospy.get_param("~lanelet2_map_path")
         self.lanelet2_map = load_lanelet2_map(lanelet2_map_path)
-        self.output_frame = rospy.get_param("output_frame")
-        self.distance_to_goal_limit = rospy.get_param("distance_to_goal_limit")
+        self.output_frame = rospy.get_param("lanelet2_global_planner/output_frame")
+        self.distance_to_goal_limit = rospy.get_param("lanelet2_global_planner/distance_to_goal_limit")
         #self.distance_to_centerline_limit = rospy.get_param("~distance_to_centerline_limit")
-        self.speed_limit = rospy.get_param("speed_limit")
-        self.ego_vehicle_stopped_speed_limit = rospy.get_param("ego_vehicle_stopped_speed_limit")
-        #self.lane_change = rospy.get_param("~lane_change")
+        self.speed_limit = rospy.get_param("global_planner/speed_limit")
+        #self.ego_vehicle_stopped_speed_limit = rospy.get_param("ego_vehicle_stopped_speed_limit")
         #self.lanelet_search_radius = rospy.get_param("~lanelet_search_radius")
-        #self.lane_change_base_length = rospy.get_param("lane_change_base_length")
-        #self.lane_change_perlane_length = rospy.get_param("lane_change_perlane_length")
-        self.waypoint_interval = rospy.get_param("waypoint_interval")
+        #self.waypoint_interval = rospy.get_param("waypoint_interval")
         #self.routing_cost = rospy.get_param("~routing_cost")
 
         # traffic rules
@@ -60,6 +59,15 @@ class Lanelet2GlobalPlanner:
             msg.pose.orientation.w, msg.header.frame_id)
         
         self.goal_point = BasicPoint2d(msg.pose.position.x, msg.pose.position.y)
+        
+        if self.current_location is None:
+            # TODO handle if current_pose gets lost at later stage - see current_pose_callback
+            rospy.logwarn("%s - current_pose not available", rospy.get_name())
+            return
+
+        start_point = shapely.Point(self.current_location.x, self.current_location.y)
+        new_goal = shapely.Point(self.goal_point.x, self.goal_point.y)
+
         # get start and end lanelets
         start_lanelet = findNearest(self.lanelet2_map.laneletLayer, self.current_location, 1)[0][1]
         goal_lanelet = findNearest(self.lanelet2_map.laneletLayer, self.goal_point, 1)[0][1]
@@ -77,7 +85,23 @@ class Lanelet2GlobalPlanner:
         print(path_no_lane_change)
 
         waypoints = self.lanelet_to_waypoint(path_no_lane_change)
-        self.waypoint_pub(waypoints)
+
+        global_path = PathWrapper(waypoints, velocities=True, blinkers=True)
+
+        # Find distance to start and goal waypoints
+        start_point_distance = global_path.linestring.project(start_point)
+        new_goal_point_distance = global_path.linestring.project(new_goal)
+
+        # Interpolate point coordinates
+        new_goal_on_path = global_path.linestring.interpolate(new_goal_point_distance)
+
+        # Update member variables
+        self.goal_point = new_goal_on_path
+        
+        # Trim the global path 
+        trimmed_waypoints = global_path.extract_waypoints(start_point_distance, new_goal_point_distance, trim=True, copy=True)
+
+        self.waypoint_pub(trimmed_waypoints)
 
     def current_pose_callback(self, msg):
         self.current_location = BasicPoint2d(msg.pose.position.x, msg.pose.position.y)

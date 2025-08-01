@@ -1,0 +1,15 @@
+For the practice 4 solution I used some code from the lanelet2_global_planner.py code in
+the full version autoware_mini folder. I used shapely to generate a start point and a goal point
+based on the self.current_position and the self.goal_point variables I already had available.
+
+After that I created a global path by using the PathWrapper class which will return an object
+that encapsulates all the waypoints in a given list and provides useful geometries such as a linestring.
+
+I was then able to project the start point distance and a new goal point distance using the
+linestring.interpolate() function on the global path object. Then I could interpolate from the new
+goal point distance a new goal on the path and update the self.goal_point member variable with that
+value.
+
+Finally, I used another useful part of the PathWrapper class, the extract waypoints member function.
+This allowed me to trim the final lanelet and returned to me the final trimmed waypoints which I could
+then publish.
