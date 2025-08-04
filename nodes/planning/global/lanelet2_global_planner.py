@@ -27,12 +27,7 @@ class Lanelet2GlobalPlanner:
         self.lanelet2_map = load_lanelet2_map(lanelet2_map_path)
         self.output_frame = rospy.get_param("lanelet2_global_planner/output_frame")
         self.distance_to_goal_limit = rospy.get_param("lanelet2_global_planner/distance_to_goal_limit")
-        #self.distance_to_centerline_limit = rospy.get_param("~distance_to_centerline_limit")
         self.speed_limit = rospy.get_param("global_planner/speed_limit")
-        #self.ego_vehicle_stopped_speed_limit = rospy.get_param("ego_vehicle_stopped_speed_limit")
-        #self.lanelet_search_radius = rospy.get_param("~lanelet_search_radius")
-        #self.waypoint_interval = rospy.get_param("waypoint_interval")
-        #self.routing_cost = rospy.get_param("~routing_cost")
 
         # traffic rules
         traffic_rules = lanelet2.traffic_rules.create(lanelet2.traffic_rules.Locations.Germany,
@@ -43,6 +38,7 @@ class Lanelet2GlobalPlanner:
         #class variables
         self.current_location = None
         self.goal_point = None
+        self.arrived = False
 
         #Publishers
         self.waypoints_pub = rospy.Publisher('global_path', Path, queue_size=10, latch=True)
@@ -52,21 +48,13 @@ class Lanelet2GlobalPlanner:
         rospy.Subscriber('/localization/current_pose', PoseStamped, self.current_pose_callback, queue_size=1)
 
     def goal_callback(self, msg):
-        # loginfo message about receiving the goal point
-        rospy.loginfo("%s - goal position (%f, %f, %f) orientation (%f, %f, %f, %f) in %s frame", rospy.get_name(),
-            msg.pose.position.x, msg.pose.position.y, msg.pose.position.z,
-            msg.pose.orientation.x, msg.pose.orientation.y, msg.pose.orientation.z,
-            msg.pose.orientation.w, msg.header.frame_id)
         
         self.goal_point = BasicPoint2d(msg.pose.position.x, msg.pose.position.y)
-        
+        self.arrived = False
+
         if self.current_location is None:
-            # TODO handle if current_pose gets lost at later stage - see current_pose_callback
             rospy.logwarn("%s - current_pose not available", rospy.get_name())
             return
-
-        start_point = shapely.Point(self.current_location.x, self.current_location.y)
-        new_goal = shapely.Point(self.goal_point.x, self.goal_point.y)
 
         # get start and end lanelets
         start_lanelet = findNearest(self.lanelet2_map.laneletLayer, self.current_location, 1)[0][1]
@@ -86,32 +74,21 @@ class Lanelet2GlobalPlanner:
 
         waypoints = self.lanelet_to_waypoint(path_no_lane_change)
 
-        global_path = PathWrapper(waypoints, velocities=True, blinkers=True)
+        self.goal_point = BasicPoint2d(waypoints[-1].position.x, waypoints[-1].position.y )
 
-        # Find distance to start and goal waypoints
-        start_point_distance = global_path.linestring.project(start_point)
-        new_goal_point_distance = global_path.linestring.project(new_goal)
-
-        # Interpolate point coordinates
-        new_goal_on_path = global_path.linestring.interpolate(new_goal_point_distance)
-
-        # Update member variables
-        self.goal_point = new_goal_on_path
-        
-        # Trim the global path 
-        trimmed_waypoints = global_path.extract_waypoints(start_point_distance, new_goal_point_distance, trim=True, copy=True)
-
-        self.waypoint_pub(trimmed_waypoints)
+        self.waypoint_pub(waypoints)
 
     def current_pose_callback(self, msg):
         self.current_location = BasicPoint2d(msg.pose.position.x, msg.pose.position.y)
         if self.goal_point != None:
             d = math.sqrt((self.current_location.x - self.goal_point.x)*(self.current_location.x - self.goal_point.x)  
                     + (self.current_location.y - self.goal_point.y)*(self.current_location.y - self.goal_point.y))
-            if d < self.distance_to_goal_limit:
+
+            if d < self.distance_to_goal_limit and not self.arrived:
                 waypoints = []
                 self.waypoint_pub(waypoints)
                 rospy.loginfo("%s - Goal has been reached, path cleared", rospy.get_name())
+                self.arrived = True
                 return
 
 
