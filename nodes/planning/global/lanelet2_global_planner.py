@@ -13,8 +13,6 @@ from lanelet2.geometry import findNearest
 from autoware_mini.lanelet2 import load_lanelet2_map
 from geometry_msgs.msg import PoseStamped
 from autoware_mini.msg import Path, Waypoint
-from autoware_mini.path import PathWrapper
-import shapely
  
 
 
@@ -27,7 +25,7 @@ class Lanelet2GlobalPlanner:
         self.lanelet2_map = load_lanelet2_map(lanelet2_map_path)
         self.output_frame = rospy.get_param("lanelet2_global_planner/output_frame")
         self.distance_to_goal_limit = rospy.get_param("lanelet2_global_planner/distance_to_goal_limit")
-        self.speed_limit = rospy.get_param("global_planner/speed_limit")
+        self.speed_limit = rospy.get_param("lanelet2_global_planner/speed_limit")
 
         # traffic rules
         traffic_rules = lanelet2.traffic_rules.create(lanelet2.traffic_rules.Locations.Germany,
