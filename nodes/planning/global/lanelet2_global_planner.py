@@ -70,7 +70,6 @@ class Lanelet2GlobalPlanner:
         path = route.shortestPath()
         # This returns LaneletSequence to a point where a lane change would be necessary to continue
         path_no_lane_change = path.getRemainingLane(start_lanelet)
-        print(path_no_lane_change)
 
         waypoints = self.lanelet_to_waypoint(path_no_lane_change)
 
