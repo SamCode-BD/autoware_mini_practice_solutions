@@ -77,6 +77,7 @@ class ClusterDetector:
 
             # create DetectedObject message
             object = DetectedObject()
+            object.id = i
             object.label = "unknown"
             object.color = BLUE80P
             object.valid = True
