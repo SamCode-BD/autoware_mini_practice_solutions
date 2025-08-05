@@ -91,14 +91,11 @@ class LocalPathExtractor:
 
            # Insert 0 at the start
            global_path_distances = np.insert(global_path_distances, 0, 0.0)  
-
-           global_path_velocities_interpolator = interp1d(global_path_distances, global_path_velocities)
+           global_path_velocities_interpolator = interp1d(global_path_distances, global_path_velocities, bounds_error=False, fill_value="extrapolate")
 
            # extract local path using distances and velocities interpolator
            local_path_waypoints = self.extract_waypoints(global_path_linestring, global_path_distances, ego_distance_from_global_path_start, self.local_path_length, global_path_velocities_interpolator)
 
-           local_path = Path()
-           local_path.header = current_pose.header
            local_path.waypoints = local_path_waypoints
 
            self.local_path_pub.publish(local_path)
