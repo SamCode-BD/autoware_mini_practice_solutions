@@ -42,7 +42,6 @@ class CollisionPointsManager:
         # subscribers
         rospy.Subscriber('extracted_local_path', Path, self.path_callback, queue_size=1, tcp_nodelay=True)
         rospy.Subscriber('/detection/final_objects', DetectedObjectArray, self.detected_objects_callback, queue_size=1, buff_size=2**20, tcp_nodelay=True)
-        rospy.Subscriber('global_path', Path, self.global_path_callback, queue_size=1, tcp_nodelay=True)
 
     def detected_objects_callback(self, msg):
         self.detected_objects = msg.objects
@@ -65,24 +64,31 @@ class CollisionPointsManager:
             local_path_msg.header = msg.header
             self.local_path_collision_pub.publish(local_path_msg)
             return
-        distance_to_stop = self.braking_safety_distance_goal 
         
-        deceleration_limit = np.inf
+        #distance_to_stop = self.braking_safety_distance_goal 
         
-        #linestring = shapely.LineString([(waypoint.position.x, waypoint.position.y) for waypoint in msg.waypoints])
-        linestring = shapely.LineString(msg.position.x, msg.position.y)
+        #deceleration_limit = np.inf
+        
+        linestring = shapely.LineString([(waypoint.position.x, waypoint.position.y) for waypoint in msg.waypoints])
+    
 
         buffered_linestring = linestring.buffer(self.safety_box_width / 2.0, cap_style= "flat")
         shapely.prepare(buffered_linestring)
 
         for obj in detected_objects:
-            convex_hull_points = shapely.Polygon(obj.polygon.points)
+
+            convex_hull_points = np.array(obj.convex_hull)
+            convex_hull_points = convex_hull_points.reshape(-1, 3)
+            convex_xy = convex_hull_points[:, :2]
+            convex_hull_points = shapely.Polygon(convex_xy) 
+            obj_speed = np.linalg.norm([obj.velocity.x, obj.velocity.y, obj.velocity.z])           
+            
             if buffered_linestring.intersects(convex_hull_points):
                 intersection_points = shapely.get_coordinates(buffered_linestring.intersection(convex_hull_points))
                 for x, y in intersection_points:
                     collision_points = np.append(collision_points, np.array([(x, y, obj.centroid.z, obj.velocity.x, obj.velocity.y, obj.velocity.z,
-                                            self.braking_safety_distance_obstacle, np.inf, 3 if obj.speed < self.stopped_speed_limit else 4)], dtype=DTYPE))
-            
+                                            self.braking_safety_distance_obstacle, np.inf, 3 if obj_speed< self.stopped_speed_limit else 4)], dtype=DTYPE))
+
         local_path_msg = msgify(PointCloud2, collision_points)
         local_path_msg.header = msg.header
         self.local_path_collision_pub.publish(local_path_msg)
