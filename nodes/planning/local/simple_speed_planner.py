@@ -27,6 +27,7 @@ class SpeedPlanner:
         synchronization_slop = rospy.get_param("~synchronization_slop")
         self.distance_to_car_front = rospy.get_param("distance_to_car_front")
 
+
         # variables
         self.collision_points = None
         self.current_position = None
@@ -75,13 +76,16 @@ class SpeedPlanner:
             
             distances = []
             velocities = []
+
             #collision_point_velocities = np.array()
             for pt in collision_points:
                 # Convert collision point to shapely Point
                 collision_pt = shapely.geometry.Point(pt['x'], pt['y'], pt['z']) if 'x' in pt and 'y' in pt and 'z' in pt else shapely.geometry.Point(pt[0], pt[1], pt[2])
+                braking_safety_distance = pt['distance_to_stop']
                 ego_distance_from_collision_points = self.local_path_linestring.project(collision_pt)
-                target_velocity = max(math.sqrt(2 * self.default_deceleration * ego_distance_from_collision_points), 0)
-                distances.append(ego_distance_from_collision_points)
+                new_stopping_distance = ego_distance_from_collision_points - abs(self.distance_to_car_front) - abs(braking_safety_distance)
+                target_velocity = max(math.sqrt(2 * abs(self.default_deceleration) * max(new_stopping_distance, 0)), 0)
+                distances.append(new_stopping_distance)
                 velocities.append(target_velocity)
                 #get_heading_at_distance = self.get_heading_at_distance(self.local_path_linestring, ego_distance_from_collision_points)
                 #projected_vector = project_vector_to_heading(get_heading_at_distance, distance)
@@ -119,7 +123,7 @@ class SpeedPlanner:
             path.closest_object_distance = closest_object_distance # Distance to the collision point with lowest target velocity (also closest object for now)
             path.closest_object_velocity = 0# Velocity of the collision point with lowest target velocity (0)
             path.is_blocked = True
-            path.stopping_point_distance = closest_object_distance # Stopping point distance can be set to the distance to the closest object for now
+            path.stopping_point_distance = closest_object_distance + self.distance_to_car_front # Stopping point distance can be set to the distance to the closest object for now
             path.collision_point_category = collision_point_category # Category of collision point with lowest target velocity
             self.local_path_pub.publish(path)
 
