@@ -155,14 +155,12 @@ class CameraTrafficLightDetector:
                 return
             
             rois = self.calculate_roi_coordinates(stoplines_on_path, transform)
-            print("ROIs calculated: ", rois)
             
             # run model and do prediction
             
             if len(rois) > 0:
                 roi_images = self.create_roi_images(image, rois)
                 predictions = self.model.run(None, {'conv2d_1_input': roi_images})[0]
-                print(predictions)
                 #extract classses and scores from predictions
                 
                 classes = np.argmax(predictions, axis=1)
